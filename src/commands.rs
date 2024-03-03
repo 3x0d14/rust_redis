@@ -5,6 +5,7 @@ pub enum Command {
     Ping,
     Set(Set),
     Get(String),
+    Info(Option<String>),
     Null,
 }
 #[derive(Debug)]
