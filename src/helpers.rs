@@ -1,6 +1,9 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::commands::{Command, Set};
+use crate::{
+    commands::{Command, Set},
+    data::Config,
+};
 
 pub fn resp_response(message: &str) -> String {
     let l = message.len();
@@ -19,11 +22,18 @@ pub fn loose_eq(a: &str, b: &str) -> bool {
 }
 pub fn to_command(input: Vec<&str>) -> Command {
     let action = input[0].to_ascii_lowercase();
+    println!("{:?}", input);
     let result = match action.as_str() {
         "ping" => Command::Ping,
         "echo" => Command::Echo(input[1].into()),
         "set" => Command::Set(Set::from(input)),
         "get" => Command::Get(input[1].into()),
+        "info" => {
+            if input.len() == 3 {
+                return Command::Info(Some(input[2].into()));
+            }
+            Command::Info(None)
+        }
         _ => Command::Null,
     };
     result
@@ -32,4 +42,20 @@ pub fn get_current_timestamp() -> u128 {
     let start = SystemTime::now();
     let timestamp = start.duration_since(UNIX_EPOCH).unwrap().as_millis();
     timestamp
+}
+pub fn parse_config(config: Vec<String>) -> Config {
+    let l = config.len();
+    let mut conf = Config::default();
+    let mut i = 1;
+    while i < l {
+        if config[i] == "--port" {
+            let port = config[i + 1].parse::<i32>().expect("Wrong value for port");
+            conf.port = port;
+            i += 2;
+        } else if config[i] == "--replicaof" {
+            conf.replicaof = true;
+            i += 3;
+        }
+    }
+    return conf;
 }

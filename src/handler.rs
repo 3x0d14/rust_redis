@@ -1,14 +1,14 @@
 use crate::commands::Command;
-use crate::data::Val;
+use crate::data::{Config, Val};
 use crate::helpers::{get_current_timestamp, parse_array, resp_response, to_command};
-use crate::types::Memory;
+use crate::types::{AConf, Memory};
 use std::{
     io::{Read, Write},
     net::TcpStream,
     str,
 };
 
-pub fn handle(stream: &mut TcpStream, memory: &mut Memory) {
+pub fn handle(stream: &mut TcpStream, memory: &mut Memory, configuration: &AConf) {
     println!("Received message");
     let mut buffer: [u8; 532] = [0; 532];
     loop {
@@ -36,7 +36,6 @@ pub fn handle(stream: &mut TcpStream, memory: &mut Memory) {
             Command::Get(k) => {
                 let mut map = memory.lock().unwrap();
                 let mut response: String = "$-1\r\n".into();
-                let mut delete: bool = false;
                 let x = map.clone();
                 match x.get(&k) {
                     Some(v) => {
@@ -55,6 +54,17 @@ pub fn handle(stream: &mut TcpStream, memory: &mut Memory) {
                     None => {}
                 }
                 stream.write_all(response.as_bytes()).unwrap();
+            }
+            Command::Info(o) => {
+                let role;
+                if configuration.lock().unwrap().replicaof {
+                    role = "slave";
+                } else {
+                    role = "master";
+                }
+                stream
+                    .write_all(resp_response(format!("role:{}", role).as_str()).as_bytes())
+                    .unwrap();
             }
             Command::Null => {
                 let response = "$-1\r\n";
