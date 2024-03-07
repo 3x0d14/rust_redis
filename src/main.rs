@@ -7,11 +7,11 @@ mod types;
 use data::Config;
 // Uses
 use handler::handle;
-use helpers::parse_config;
+use helpers::{handshake, parse_config};
 use std::{
     collections::HashMap,
     env,
-    net::TcpListener,
+    net::{TcpListener, TcpStream},
     sync::{Arc, Mutex},
     thread,
     time::Duration,
@@ -24,10 +24,22 @@ fn main() {
     let memory: Memory = Arc::new(Mutex::new(HashMap::new()));
     let args: Vec<String> = env::args().collect();
     let c = parse_config(args);
-    let port = c.port;
-    let configuration = Arc::new(Mutex::new(c));
+    let configuration = Arc::new(Mutex::new(c.clone()));
     let listner =
-        TcpListener::bind(format!("127.0.0.1:{}", port)).expect("Failed to bind to port 6379");
+        TcpListener::bind(format!("127.0.0.1:{}", c.port)).expect("Failed to bind to port");
+    if !c.replication.master {
+        handshake(
+            &c.replication.master_host,
+            c.replication.master_port,
+            c.port,
+        );
+        // replconf_port(
+        //     &c.replication.master_host,
+        //     c.replication.master_port,
+        //     c.port,
+        // );
+        // replconf_capa(&c.replication.master_host, c.replication.master_port)
+    }
     let check_memory = Arc::clone(&memory);
     let _j = thread::spawn(move || loop {
         thread::sleep(Duration::from_secs(60));

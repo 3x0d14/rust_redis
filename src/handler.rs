@@ -1,6 +1,9 @@
 use crate::commands::Command;
-use crate::data::{Config, Val};
-use crate::helpers::{get_current_timestamp, parse_array, resp_response, to_command};
+use crate::data::{Config, Replica, Val};
+use crate::helpers::{
+    concat_u8, get_current_timestamp, hex_to_binary, parse_array, resp_command, resp_response,
+    to_command,
+};
 use crate::types::{AConf, Memory};
 use std::{
     io::{Read, Write},
@@ -9,16 +12,14 @@ use std::{
 };
 
 pub fn handle(stream: &mut TcpStream, memory: &mut Memory, configuration: &AConf) {
-    println!("Received message");
-    let mut buffer: [u8; 532] = [0; 532];
     loop {
+        let mut buffer: [u8; 532] = [0; 532];
         let n = stream.read(&mut buffer).unwrap();
         if n == 0 {
             break;
         }
-        // println!("{}", str::from_utf8(&buffer).unwrap());
-        let command = parse_array(str::from_utf8(&buffer).unwrap());
-        let parsed_command = to_command(command);
+        let command = parse_array(str::from_utf8(&buffer).unwrap(), None);
+        let parsed_command = to_command(command.clone());
         match parsed_command {
             Command::Ping => {
                 stream
@@ -29,6 +30,17 @@ pub fn handle(stream: &mut TcpStream, memory: &mut Memory, configuration: &AConf
                 stream.write_all(resp_response(&v).as_bytes()).unwrap();
             }
             Command::Set(s) => {
+                let config = configuration.lock().unwrap();
+                let replicas = config.replicas.clone();
+                for replica in replicas {
+                    // println!("We are here");
+                    // let resp_command = resp_command(command.clone());
+                    // println!("{resp_command}");
+                    // let mut stream =
+                    //     TcpStream::connect(format!("{}:{}", replica.host, replica.port)).unwrap();
+                    // stream.write(resp_command.as_bytes()).unwrap();
+                    replica.propagate(command.clone());
+                }
                 let mut m = memory.lock().unwrap();
                 m.insert(s.key.clone(), Val::from(s));
                 stream.write_all(resp_response("OK").as_bytes()).unwrap();
@@ -56,15 +68,47 @@ pub fn handle(stream: &mut TcpStream, memory: &mut Memory, configuration: &AConf
                 stream.write_all(response.as_bytes()).unwrap();
             }
             Command::Info(o) => {
+                let replication = configuration.lock().unwrap();
                 let role;
-                if configuration.lock().unwrap().replicaof {
-                    role = "slave";
-                } else {
+                if replication.replication.master {
                     role = "master";
+                } else {
+                    role = "slave";
                 }
+                let message = format!(
+                    "role:{role}\nmaster_replid:{}\nmaster_repl_offset:{}",
+                    replication.replication.replication_id, replication.replication.offset
+                );
                 stream
-                    .write_all(resp_response(format!("role:{}", role).as_str()).as_bytes())
+                    .write_all(resp_response(message.as_str()).as_bytes())
                     .unwrap();
+            }
+            Command::ReplConf(data) => {
+                let mut config = configuration.lock().unwrap();
+                let port = data.port;
+                match port {
+                    Some(v) => config.replicas.push(Replica {
+                        port: v,
+                        host: String::from("127.0.0.1"),
+                    }),
+                    None => {}
+                }
+                let response = "+OK\r\n";
+                stream.write_all(response.as_bytes()).unwrap();
+            }
+            Command::PSYNC => {
+                let config = configuration.lock().unwrap();
+                let response = format!(
+                    "+FULLRESYNC {} {}\r\n",
+                    config.replication.replication_id, config.replication.offset
+                );
+                let response = response.as_str();
+                let empty_rdb = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
+                let mut x = hex_to_binary(empty_rdb).unwrap();
+                let mut a = Vec::from(format!("${}\r\n", x.len()).as_bytes());
+                concat_u8(&mut a, &mut x);
+                stream.write_all(response.as_bytes()).unwrap();
+                stream.write_all(&a).unwrap();
             }
             Command::Null => {
                 let response = "$-1\r\n";
