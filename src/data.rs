@@ -79,7 +79,15 @@ impl Stream {
             .split("-")
             .map(|a| String::from(a))
             .collect::<Vec<String>>();
-        if top[1] == "*" {
+        if top.len() == 1 && top[0] == "*" {
+            if v_top[0] == 0 {
+                top[0] = format!("{}", get_current_timestamp());
+                top.push(String::from("0"));
+            } else {
+                top[0] = format!("{}", v_top[0] + 1);
+                top.push(String::from("0"));
+            }
+        } else if top.len() == 2 && top[1] == "*" {
             let x = top[0].parse::<u128>().unwrap();
             if x == v_top[0] {
                 let x = format!("{}", v_top[1] + 1);
