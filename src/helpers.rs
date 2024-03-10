@@ -7,8 +7,10 @@ use std::{
 };
 
 use crate::{
-    commands::{Command, ReplConfData, Set},
-    data::Config,
+    commands::{Command, ReplConfData, Set, XA},
+    data::{Config, Stream, Val, ValType},
+    errors::IdError,
+    types::{Memory, StreamMemory},
 };
 
 pub fn resp_response(message: &str) -> String {
@@ -49,6 +51,8 @@ pub fn to_command(input: Vec<&str>) -> Command {
             }
             Command::Info(None)
         }
+        "xadd" => Command::XAdd(XA::from(input)),
+        "type" => Command::Type(input[1].into()),
         "psync" => Command::PSYNC,
         "replconf" => Command::ReplConf(ReplConfData::from(input)),
         _ => Command::Null,
@@ -199,4 +203,51 @@ pub fn hex_to_binary(hex: &str) -> Option<Vec<u8>> {
 }
 pub fn concat_u8(a: &mut Vec<u8>, b: &mut Vec<u8>) {
     a.append(b);
+}
+pub fn stream_add(
+    memory: &mut Memory,
+    stream_memory: &mut StreamMemory,
+    xa: &XA,
+) -> Result<Vec<u128>, IdError> {
+    // for each stream create a val in main memory where type is stream
+    let key = xa.stream_key.clone();
+    let mut m = stream_memory.lock().unwrap();
+    let mut mem = memory.lock().unwrap();
+    let mut found = true;
+    let mut id = vec![];
+    match m.get_mut(&key) {
+        Some(v) => {
+            let v_top = &v.top;
+            let x = Stream::parse_xa(xa.clone(), v_top);
+            let x_top = x.top;
+            id = x_top.clone();
+            if x_top[0] > v_top[0] || (x_top[0] == v_top[0] && x_top[1] > v_top[1]) {
+                v.top = x_top;
+                v.map.extend(x.map)
+            } else if x_top[0] == 0 && x_top[1] == 0 {
+                return Err(IdError::NullIdError);
+            } else {
+                return Err(IdError::IdError);
+            }
+        }
+        None => {
+            found = false;
+        }
+    }
+    println!("map {:?}", m);
+    if !found {
+        let x = Stream::parse_xa(xa.clone(), &vec![0, 0]);
+        id = x.top.clone();
+        m.insert(key.clone(), x);
+        mem.insert(
+            key,
+            Val {
+                val: "".into(),
+                created_at: 0,
+                expiry: None,
+                value_type: ValType::STREAM,
+            },
+        );
+    }
+    Ok(id)
 }

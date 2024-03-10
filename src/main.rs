@@ -1,10 +1,11 @@
 // Mods
+mod actions;
 mod commands;
 mod data;
+mod errors;
 mod handler;
 mod helpers;
 mod types;
-use data::Config;
 // Uses
 use handler::handle;
 use helpers::{handshake, parse_config};
@@ -16,12 +17,13 @@ use std::{
     thread,
     time::Duration,
 };
-use types::Memory;
+use types::{Memory, StreamMemory};
 
 use crate::helpers::get_current_timestamp;
 
 fn main() {
     let memory: Memory = Arc::new(Mutex::new(HashMap::new()));
+    let stream_memory: StreamMemory = Arc::new(Mutex::new(HashMap::new()));
     let args: Vec<String> = env::args().collect();
     let c = parse_config(args);
     let configuration = Arc::new(Mutex::new(c.clone()));
@@ -63,9 +65,16 @@ fn main() {
         match stream {
             Ok(mut s) => {
                 let mut local_memory = Arc::clone(&memory);
+                let mut local_stream_memory = Arc::clone(&stream_memory);
                 let configuration_copy = Arc::clone(&configuration);
-                let _join_handle =
-                    thread::spawn(move || handle(&mut s, &mut local_memory, &configuration_copy));
+                let _join_handle = thread::spawn(move || {
+                    handle(
+                        &mut s,
+                        &mut local_memory,
+                        &mut local_stream_memory,
+                        &configuration_copy,
+                    )
+                });
             }
             Err(e) => {
                 println!("Error {e}");

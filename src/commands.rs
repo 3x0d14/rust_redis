@@ -8,6 +8,8 @@ pub enum Command {
     Info(Option<String>),
     ReplConf(ReplConfData),
     PSYNC,
+    Type(String),
+    XAdd(XA),
     Null,
 }
 #[derive(Debug)]
@@ -39,6 +41,30 @@ impl From<Vec<&str>> for Set {
             val: val,
             expiry: expiry,
         }
+    }
+}
+#[derive(Debug, Clone)]
+pub struct XA {
+    pub stream_key: String,
+    pub id: String,
+    pub key_vals: Vec<String>,
+}
+impl From<Vec<&str>> for XA {
+    fn from(value: Vec<&str>) -> Self {
+        let l = value.len();
+        let stream_key = String::from(value[1]);
+        let id = String::from(value[2]);
+        let mut key_vals: Vec<String> = vec![];
+        for i in 3..l {
+            key_vals.push(value[i].into())
+        }
+        let x = XA {
+            stream_key: stream_key,
+            id: id,
+            key_vals: key_vals,
+        };
+        println!("{:?}", x);
+        x
     }
 }
 #[derive(Debug)]
