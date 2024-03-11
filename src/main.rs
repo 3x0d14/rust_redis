@@ -12,7 +12,7 @@ use helpers::{handshake, parse_config};
 use std::{
     collections::HashMap,
     env,
-    net::{TcpListener, TcpStream},
+    net::TcpListener,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
