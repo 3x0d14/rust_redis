@@ -10,6 +10,7 @@ pub enum Command {
     PSYNC,
     Type(String),
     XAdd(XA),
+    Xrange(XRangeData),
     Null,
 }
 #[derive(Debug)]
@@ -81,6 +82,46 @@ impl From<Vec<&str>> for ReplConfData {
             }
         } else {
             ReplConfData { port: None }
+        }
+    }
+}
+#[derive(Debug, Clone)]
+pub struct XRangeData {
+    pub key: String,
+    pub a: (u128, u128),
+    pub b: (u128, u128),
+}
+impl From<Vec<&str>> for XRangeData {
+    fn from(value: Vec<&str>) -> Self {
+        let key = value[1];
+        let xraw = value[2];
+        let yraw = value[3];
+        let a;
+        let b;
+        if xraw == "-" {
+            a = (u128::MIN, u128::MIN)
+        } else {
+            let x = value[2].split("-").collect::<Vec<&str>>();
+            if x.len() == 2 {
+                a = (x[0].parse::<u128>().unwrap(), x[1].parse::<u128>().unwrap())
+            } else {
+                a = (x[0].parse::<u128>().unwrap(), 0)
+            }
+        }
+        if yraw == "+" {
+            b = (u128::MAX, u128::MAX);
+        } else {
+            let y = value[3].split("-").collect::<Vec<&str>>();
+            if y.len() == 2 {
+                b = (y[0].parse::<u128>().unwrap(), y[1].parse::<u128>().unwrap())
+            } else {
+                b = (y[0].parse::<u128>().unwrap(), 0)
+            }
+        }
+        XRangeData {
+            key: key.into(),
+            a: a,
+            b: b,
         }
     }
 }
