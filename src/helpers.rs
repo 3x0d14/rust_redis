@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    commands::{Command, ReplConfData, Set, XA},
+    commands::{Command, ReplConfData, Set, XRangeData, XA},
     data::{Config, Stream, Val, ValType},
     errors::IdError,
     types::{Memory, StreamMemory},
@@ -55,6 +55,7 @@ pub fn to_command(input: Vec<&str>) -> Command {
         "type" => Command::Type(input[1].into()),
         "psync" => Command::PSYNC,
         "replconf" => Command::ReplConf(ReplConfData::from(input)),
+        "xrange" => Command::Xrange(XRangeData::from(input)),
         _ => Command::Null,
     };
     result
@@ -250,4 +251,11 @@ pub fn stream_add(
         );
     }
     Ok(id)
+}
+pub fn get_time(id: &String) -> (u128, u128) {
+    let mut a = id.split("-");
+    (
+        a.next().unwrap().parse::<u128>().unwrap(),
+        a.next().unwrap().parse::<u128>().unwrap(),
+    )
 }
