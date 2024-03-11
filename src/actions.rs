@@ -1,10 +1,12 @@
 use std::{io::Write, net::TcpStream};
 
 use crate::{
-    commands::{ReplConfData, Set, XA},
-    data::{Replica, Stream, Val, ValType},
+    commands::{ReplConfData, Set, XRangeData, XA},
+    data::{EntryRepresentation, Replica, StreamRepresentation, Val, ValType},
     errors::IdError,
-    helpers::{concat_u8, get_current_timestamp, hex_to_binary, resp_response, stream_add},
+    helpers::{
+        concat_u8, get_current_timestamp, get_time, hex_to_binary, resp_response, stream_add,
+    },
     types::{AConf, Memory, StreamMemory},
 };
 
@@ -146,4 +148,40 @@ pub fn xadd(
             }
         },
     }
+}
+pub fn xrange_action(stream: &mut TcpStream, stream_memory: &mut StreamMemory, xrange: XRangeData) {
+    // get Stream data with key,
+    // convert stream into a filtrable structure
+    // filter on a b
+    // transform the result into a parsable structure
+    // parse the structure
+    // RESP array return
+    let key = xrange.key;
+    let a = xrange.a;
+    let b = xrange.b;
+    let mut representation = StreamRepresentation::new();
+    let local_memory = stream_memory.lock().unwrap();
+    let s = local_memory.get(&key).unwrap();
+    for (id, entry) in s.map.clone().into_iter() {
+        let nid = get_time(&id);
+        if nid >= a && nid <= b {
+            let mut repr_data: Vec<String> = vec![];
+            for (key, val) in entry.into_iter() {
+                repr_data.push(key);
+                repr_data.push(val.val);
+            }
+            let entry_representation = EntryRepresentation {
+                nid: nid,
+                id: id,
+                data: repr_data,
+            };
+            representation.data.push(entry_representation);
+        }
+    }
+    representation
+        .data
+        .sort_by(|a, b| a.nid.partial_cmp(&b.nid).unwrap());
+    println!("{}", representation.resp());
+    let response = representation.resp();
+    stream.write_all(response.as_bytes()).unwrap();
 }
