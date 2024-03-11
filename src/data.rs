@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::Write, net::TcpStream};
 
 use crate::{
     commands::{Set, XA},
-    helpers::{get_current_timestamp, resp_command},
+    helpers::{get_current_timestamp, resp_command, resp_response},
     types::StreamMap,
 };
 #[derive(Debug, Clone)]
@@ -166,5 +166,42 @@ impl Default for Config {
             },
             replicas: vec![],
         }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct EntryRepresentation {
+    pub nid: (u128, u128),
+    pub id: String,
+    pub data: Vec<String>,
+}
+impl EntryRepresentation {
+    pub fn resp(&self) -> String {
+        let mut result = String::from("*2\r\n");
+        result.push_str(&resp_response(&self.id));
+        let l = self.data.len();
+        result.push_str(format!("*{l}\r\n").as_str());
+        for i in 0..l {
+            result.push_str(&resp_response(&self.data[i]));
+        }
+        result
+    }
+}
+#[derive(Clone, Debug)]
+pub struct StreamRepresentation {
+    pub data: Vec<EntryRepresentation>,
+}
+impl StreamRepresentation {
+    pub fn new() -> Self {
+        StreamRepresentation { data: vec![] }
+    }
+    pub fn resp(&self) -> String {
+        let mut result = String::new();
+        let l = self.data.len();
+        result.push_str(format!("*{l}\r\n").as_str());
+        for i in 0..l {
+            let x = self.data[i].clone();
+            result.push_str(x.resp().as_str());
+        }
+        result
     }
 }
