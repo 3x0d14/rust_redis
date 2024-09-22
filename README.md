@@ -3,7 +3,7 @@ This is an attempt to code a simple Redis clone, in order to learn how in-memory
 ## Supported features
 - Set/Get with expiry
 - Simple replication
-- Working on adding support for streams
+- (I am currently working on adding support for streams)
 ## Todo
 - [ ] Fully featured replication
 - [ ] Full support for streams and blocking streams
